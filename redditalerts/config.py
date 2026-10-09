@@ -65,13 +65,6 @@ DEFAULTS = {
         "ai_model": "claude-opus-5-5",
     },
 
-    # --- Where alerts go (all optional) --------------------------------------
-    "telegram_bot_token": "",
-    "telegram_chat_id": "",
-    "slack_webhook_url": "",
-    "discord_webhook_url": "",
-    "generic_webhook_url": "",
-
     # --- Reddit access -------------------------------------------------------
     # Optional Reddit API app credentials. Without them, public JSON is used.
     "reddit_client_id": "",
@@ -89,15 +82,10 @@ DEFAULTS = {
     "reports_dir": "reports",
 }
 
-# Environment variables override config.json (handy for GitHub Actions secrets).
+# Environment variables override config.json.
 ENV_OVERRIDES = {
     "REDDIT_CLIENT_ID": "reddit_client_id",
     "REDDIT_CLIENT_SECRET": "reddit_client_secret",
-    "TELEGRAM_BOT_TOKEN": "telegram_bot_token",
-    "TELEGRAM_CHAT_ID": "telegram_chat_id",
-    "SLACK_WEBHOOK_URL": "slack_webhook_url",
-    "DISCORD_WEBHOOK_URL": "discord_webhook_url",
-    "GENERIC_WEBHOOK_URL": "generic_webhook_url",
 }
 
 

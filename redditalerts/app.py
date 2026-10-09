@@ -24,9 +24,8 @@ EDITABLE = {
     "min_comments": int, "posts_per_hour": int, "check_every_minutes": int,
     "max_post_age_hours": int, "subreddits": list, "search_queries": list,
     "keywords_any": list, "keywords_block": list, "uniqueness_mode": str,
-    "skip_nsfw": bool, "skip_pinned_posts": bool, "telegram_bot_token": str,
-    "telegram_chat_id": str, "slack_webhook_url": str, "discord_webhook_url": str,
-    "generic_webhook_url": str, "reddit_client_id": str, "reddit_client_secret": str,
+    "skip_nsfw": bool, "skip_pinned_posts": bool,
+    "reddit_client_id": str, "reddit_client_secret": str,
 }
 REPORT_EDITABLE = {"create_each_run": bool, "every_minutes": int, "topic": str,
                    "keywords": list, "min_comments": int, "max_posts": int, "use_ai": bool}
@@ -114,10 +113,6 @@ class App:
         for b in backups:
             b["whatsapp"] = whatsapp_text(b)
         runs = self.store.state.get("runs") or []
-        channels = [name for name, ok in (
-            ("Telegram", cfg["telegram_bot_token"] and cfg["telegram_chat_id"]),
-            ("Slack", cfg["slack_webhook_url"]), ("Discord", cfg["discord_webhook_url"]),
-            ("Webhook", cfg["generic_webhook_url"])) if ok]
         reports = [r for r in reversed(self.store.state.get("reports") or [])
                    if os.path.exists(os.path.join(self.reports_dir, r["file"]))][:30]
         settings = {k: cfg[k] for k in EDITABLE}
@@ -127,7 +122,7 @@ class App:
             "last_run": runs[-1] if runs else None,
             "next_run_at": self.next_run_at(), "errors": self.last_errors,
             "sent": sent, "backups": backups, "reports": reports,
-            "channels": channels, "oauth": bool(cfg["reddit_client_id"] and cfg["reddit_client_secret"]),
+            "oauth": bool(cfg["reddit_client_id"] and cfg["reddit_client_secret"]),
             "ai": ai_available(cfg), "settings": settings,
             "sent_last_hour": self.store.sent_in_last_hour(),
         }

@@ -26,9 +26,12 @@ every 20 minutes and picks **up to 3 posts per hour** that:
 
 ## Using the dashboard
 
-- **Alerts to share**: click **Copy** and paste into the WhatsApp Alerts group. The
+The dashboard looks and feels like Reddit, with light and dark mode (it follows your
+computer's setting; the sun/moon button in the top right switches it).
+
+- **Alerts**: click **Copy for WhatsApp** and paste into the WhatsApp Alerts group. The
   message is already formatted (bold title, subreddit, comment count, link).
-  **Copy last hour's alerts** copies all of them at once.
+  **Copy this hour's alerts** copies all of them at once.
 - **Not relevant** removes a post forever. **Backup picks** are other qualifying posts;
   click **Use this** to swap one in.
 - **Reports (Word)**: type a topic (e.g. *Delhi Protest*) and optional keywords, then click
@@ -46,18 +49,12 @@ For an analyst-style narrative like the team's hand-written reports, set an Anth
 before starting (`ANTHROPIC_API_KEY`). The `anthropic` package installs automatically when you
 start with the launcher. Always review AI text before sharing.
 
-### Sending alerts automatically (optional)
-
-WhatsApp has no official way for bots to post into groups, so the default is copy and paste.
-If the team also uses Telegram, Slack or Discord, paste a bot token or webhook URL in
-**Settings → Send alerts automatically** and every alert is posted there too.
-
 ## Command line (optional)
 
 ```
 python run.py                 # dashboard + checks every 20 minutes (default)
 python run.py preview         # list posts that qualify right now, send nothing
-python run.py once            # one check: pick, record and send alerts, then exit
+python run.py once            # one check: pick and record alerts, print them, then exit
 python run.py once --report   # same, plus a Word report
 python run.py report --topic "Delhi Protest" --keywords "Delhi protest, Jantar Mantar, SIR"
 ```

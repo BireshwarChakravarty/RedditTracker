@@ -1,4 +1,4 @@
-"""One check cycle: fetch Reddit, pick new alerts, deliver them, optionally write a report."""
+"""One check cycle: fetch Reddit, pick new alerts, optionally write a report."""
 
 import logging
 import math
@@ -83,7 +83,6 @@ def run_cycle(cfg, store, client, send=True, make_report=False, report_topic=Non
             store.mark_sent(dedupe_key(p), item)
         with store.lock:
             store.state["backups"] = backups
-        result["errors"] += messages.deliver(cfg, picks)
 
     if make_report and posts:
         try:

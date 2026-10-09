@@ -1,13 +1,6 @@
-"""Alert text for WhatsApp/Telegram/Slack/Discord, plus delivery to webhooks."""
+"""WhatsApp-ready alert text."""
 
-import html
-import json
-import logging
 import time
-
-from .reddit import http_request
-
-log = logging.getLogger(__name__)
 
 
 def permalink(post):
@@ -48,49 +41,3 @@ def whatsapp_text(item):
 
 def whatsapp_batch(items):
     return "\n\n".join(whatsapp_text(i) for i in items)
-
-
-def _post_json(url, payload):
-    status, body = http_request(url, headers={"Content-Type": "application/json"},
-                                data=json.dumps(payload).encode(), method="POST")
-    if status >= 300:
-        raise RuntimeError(f"HTTP {status}: {body[:200]}")
-
-
-def deliver(cfg, items):
-    """Send alerts to every configured channel. Returns a list of error strings."""
-    errors = []
-    if not items:
-        return errors
-    if cfg.get("telegram_bot_token") and cfg.get("telegram_chat_id"):
-        url = f"https://api.telegram.org/bot{cfg['telegram_bot_token']}/sendMessage"
-        for i in items:
-            text = (f"<b>{html.escape(i['title'])}</b>\nr/{html.escape(i['subreddit'])} · "
-                    f"{_k(i['num_comments'])} comments · {_k(i['score'])} upvotes · {i['age']}\n"
-                    f"{i['url']}")
-            try:
-                _post_json(url, {"chat_id": cfg["telegram_chat_id"], "text": text,
-                                 "parse_mode": "HTML"})
-            except Exception as e:
-                errors.append(f"Telegram: {e}")
-    if cfg.get("slack_webhook_url"):
-        try:
-            _post_json(cfg["slack_webhook_url"], {"text": whatsapp_batch(items)})
-        except Exception as e:
-            errors.append(f"Slack: {e}")
-    if cfg.get("discord_webhook_url"):
-        for i in items:
-            content = whatsapp_text(i).replace(f"*{i['title']}*", f"**{i['title']}**", 1)
-            try:
-                _post_json(cfg["discord_webhook_url"], {"content": content[:1900]})
-            except Exception as e:
-                errors.append(f"Discord: {e}")
-    if cfg.get("generic_webhook_url"):
-        try:
-            _post_json(cfg["generic_webhook_url"],
-                       {"text": whatsapp_batch(items), "alerts": items})
-        except Exception as e:
-            errors.append(f"Webhook: {e}")
-    for e in errors:
-        log.warning("Delivery failed: %s", e)
-    return errors
