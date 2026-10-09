@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+data/
+reports/
+config.json.tmp
+.env
+config.json
