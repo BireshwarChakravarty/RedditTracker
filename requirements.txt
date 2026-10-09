@@ -1,0 +1,5 @@
+# Optional extras. The tool runs without them.
+# anthropic: AI-written report narrative (needs ANTHROPIC_API_KEY)
+# certifi:   fixes SSL certificate errors on some Mac Python installs
+anthropic
+certifi
