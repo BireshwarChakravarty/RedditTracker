@@ -4,4 +4,5 @@ data/
 reports/
 config.json.tmp
 .env
-config.json
+site/
+store/

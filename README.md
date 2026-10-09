@@ -14,7 +14,44 @@ every 20 minutes and picks **up to 3 posts per hour** that:
   links, so only content posted on Reddit itself (text, Reddit images/videos/galleries) counts,
 - were **never alerted before**: no repeats, and the same story posted in two subreddits counts once.
 
-## Start it (no technical setup)
+## The team web page (hosted free on GitHub)
+
+The team opens **https://bireshwarchakravarty.github.io/RedditTracker/**. There's nothing to
+install, and it works on phones. GitHub checks Reddit every 20 minutes by itself, so no
+computer needs to stay on. The page lets the team:
+
+- **Copy for WhatsApp** on any alert, or **Copy this hour's alerts** at once
+- **Export alerts (Excel / CSV)**: the last 7 days of alerts as a spreadsheet
+- **Download** the Word reports (one is made automatically about every hour)
+- **Hide** a post they don't want to see (on their own device only)
+
+It costs nothing because the repository is public. The page is public too; it only shows
+public Reddit posts and reports built from them.
+
+### One-time setup (repository owner)
+
+1. **Turn on the web page:** repository **Settings → Pages**, under *Build and deployment* set
+   **Source** to **GitHub Actions**.
+2. **Start the first check:** **Actions** tab → **Reddit Alerts** → **Run workflow** → **Run workflow**.
+   After about 2 minutes the page is live at the link above, and it then updates every 20 minutes.
+
+### Day to day
+
+- **Check now / report on a topic:** Actions → Reddit Alerts → **Run workflow**. Leave the boxes
+  empty to just check for alerts, or enter a topic (e.g. *Delhi Protest*) and keywords for a
+  Word report. Only people with access to the repository can do this.
+- **Change settings** (comment minimum, subreddits, searches, report topic): edit
+  [`config.json`](config.json) on GitHub (pencil icon) and commit. The next check uses it.
+- **History** (what was already sent) is kept on the `alerts-data` branch. Don't delete it,
+  or old posts may be alerted again.
+- **AI-written reports (optional):** add a repository secret named `ANTHROPIC_API_KEY`
+  (Settings → Secrets and variables → Actions). Never put keys in `config.json`, because the
+  repository is public.
+- GitHub may run scheduled checks a few minutes late when it's busy. If nobody commits to
+  the repository for 60 days, GitHub pauses the schedule and emails the owner; click
+  **Enable workflow** on the Actions tab to resume.
+
+## Run it on your own computer instead (optional)
 
 1. Install Python 3.9+ from https://www.python.org/downloads/ (on Windows tick **"Add Python to PATH"**).
 2. Download this folder (GitHub → **Code → Download ZIP**) and unzip it.

@@ -85,6 +85,8 @@ DEFAULTS = {
 ENV_OVERRIDES = {
     "REDDIT_CLIENT_ID": "reddit_client_id",
     "REDDIT_CLIENT_SECRET": "reddit_client_secret",
+    "DATA_DIR": "data_dir",
+    "REPORTS_DIR": "reports_dir",
 }
 
 
