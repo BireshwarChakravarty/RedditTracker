@@ -43,7 +43,7 @@ class FakeClient:
 
 def make_cfg(tmp):
     cfg = config_mod._merge(config_mod.DEFAULTS, {})
-    cfg.update(subreddits=["india"], data_dir=os.path.join(tmp, "data"),
+    cfg.update(subreddits=["india"], search_queries=[], data_dir=os.path.join(tmp, "data"),
                reports_dir=os.path.join(tmp, "reports"))
     cfg["report"]["use_ai"] = False
     return cfg

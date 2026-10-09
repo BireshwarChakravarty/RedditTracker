@@ -14,8 +14,8 @@ DEFAULTS = {
         "india", "IndiaSpeaks", "indianews", "IndianFocus", "CriticalThinkingIndia",
         "unitedstatesofindia", "indiadiscussion", "IndianModerate",
     ],
-    # Extra Reddit-wide searches (e.g. "Delhi protest"). Leave empty to skip.
-    "search_queries": [],
+    # Extra Reddit-wide searches (top posts by comments in the last day).
+    "search_queries": ["delhi protest"],
     # If not empty, a post must mention at least one of these words to qualify.
     "keywords_any": [],
     # Posts mentioning any of these words are always skipped.
