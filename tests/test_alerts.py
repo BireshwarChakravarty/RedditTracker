@@ -32,10 +32,12 @@ class FakeClient:
     def subreddit(self, name, sort="hot", t=None, limit=100):
         return copy.deepcopy(self.posts)
 
-    def search(self, *a, **k):
-        return []
+    search_results = []
 
-    def top_comments(self, pid, limit=8):
+    def search(self, *a, **k):
+        return copy.deepcopy(self.search_results)
+
+    def top_comments(self, pid, limit=8, subreddit=None):
         return [{"author": "u1", "score": 120, "body": "This is a <test> comment & more"}]
 
 
@@ -130,6 +132,12 @@ class EngineTests(unittest.TestCase):
         run_cycle(self.cfg, self.store, FakeClient(self.posts))
         again = Store(config_mod.resolve_dir(self.cfg, "data_dir"))
         self.assertIn("p1", again.state["sent"])
+
+    def test_report_searches_do_not_become_alerts(self):
+        client = FakeClient([])
+        client.search_results = [post("g1", "Controller giveaway", 2100, subreddit="Gamesir")]
+        res = run_cycle(self.cfg, self.store, client, make_report=True, report_keywords=["SIR"])
+        self.assertEqual([], res["new_alerts"])
 
     def test_report_docx(self):
         self.cfg["report"]["min_comments"] = 50

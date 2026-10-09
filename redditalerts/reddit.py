@@ -1,8 +1,8 @@
 """Minimal Reddit client (standard library only).
 
-Uses Reddit's public JSON pages by default. If Reddit API app credentials are
-configured, uses OAuth instead (more reliable from cloud servers).
-"""
+Order of preference: Reddit API (if app credentials are configured), then Reddit's
+public JSON feed, then Reddit's web pages (used automatically when Reddit blocks the
+JSON feed on this network)."""
 
 import base64
 import json
@@ -15,6 +15,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from . import webparse
+
 log = logging.getLogger(__name__)
 
 PUBLIC_BASE = "https://www.reddit.com"
@@ -23,6 +25,10 @@ OAUTH_BASE = "https://oauth.reddit.com"
 
 class RedditError(Exception):
     pass
+
+
+class Blocked(RedditError):
+    """Reddit refused its JSON feed for this network (web pages may still work)."""
 
 
 def _ssl_context():
@@ -70,6 +76,7 @@ class RedditClient:
         self._token = None
         self._token_expiry = 0
         self._last_call = 0.0
+        self.mode = "json"
 
     @property
     def using_oauth(self):
@@ -92,22 +99,16 @@ class RedditClient:
             self._token_expiry = time.time() + int(payload.get("expires_in", 3600))
         return {"Authorization": "Bearer " + self._token}
 
-    def get(self, path, params=None):
-        """GET a Reddit path like '/r/india/hot'. Returns parsed JSON."""
-        params = dict(params or {})
-        params["raw_json"] = 1
-        if self.using_oauth:
-            url = OAUTH_BASE + path
-        else:
-            url = PUBLIC_BASE + path + ".json"
-        url += "?" + urllib.parse.urlencode(params)
+    def _fetch(self, url, accept, what):
+        """GET with pacing and retries. Returns the body of a 200 response."""
         for attempt in range(4):
             wait = self.delay - (time.time() - self._last_call)
             if wait > 0:
                 time.sleep(wait)
             self._last_call = time.time()
-            headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
-            headers.update(self._auth_header())
+            headers = {"User-Agent": self.user_agent, "Accept": accept}
+            if url.startswith(OAUTH_BASE):
+                headers.update(self._auth_header())
             try:
                 status, body = http_request(url, headers=headers)
             except (urllib.error.URLError, OSError, subprocess.CalledProcessError) as e:
@@ -116,22 +117,50 @@ class RedditClient:
                 time.sleep(5 * (attempt + 1))
                 continue
             if status == 200:
-                try:
-                    return json.loads(body)
-                except ValueError:
-                    raise RedditError("Reddit returned a non-JSON page (possibly a block or captcha).")
+                if accept == "text/html" and "reputation-recaptcha" in body and not any(
+                        m in body for m in ("<shreddit-post ", "<shreddit-comment ",
+                                            "search-telemetry-tracker")):
+                    raise RedditError(f"Reddit asked for a captcha on {what}; try again later.")
+                return body
             if status == 429 or status >= 500:
                 time.sleep(15 * (attempt + 1))
                 continue
+            if status == 403 and "blocked by network security" in body:
+                raise Blocked(f"Reddit blocked this network for {what}")
             if status in (401, 403):
-                raise RedditError(
-                    f"Reddit refused the request (HTTP {status}) for {path}. The subreddit may be "
-                    "private/banned, or Reddit is blocking this network; adding Reddit API "
-                    "credentials usually fixes the latter.")
+                raise RedditError(f"Reddit refused {what} (HTTP {status}); it may be private or banned.")
             if status == 404:
-                raise RedditError(f"Not found: {path}")
-            raise RedditError(f"Reddit HTTP {status} for {path}")
-        raise RedditError(f"Reddit kept rate-limiting {path}; try again later.")
+                raise RedditError(f"Not found: {what}")
+            raise RedditError(f"Reddit HTTP {status} for {what}")
+        raise RedditError(f"Reddit kept rate-limiting {what}; try again later.")
+
+    def get(self, path, params=None):
+        """GET a Reddit JSON path like '/r/india/hot'. Returns parsed JSON."""
+        params = dict(params or {})
+        params["raw_json"] = 1
+        base = OAUTH_BASE + path if self.using_oauth else PUBLIC_BASE + path + ".json"
+        body = self._fetch(base + "?" + urllib.parse.urlencode(params), "application/json", path)
+        try:
+            return json.loads(body)
+        except ValueError:
+            raise Blocked("Reddit returned a web page instead of data")
+
+    def _web(self, path, params, what):
+        return self._fetch(PUBLIC_BASE + path + "?" + urllib.parse.urlencode(params),
+                           "text/html", what)
+
+    def _use(self, json_call, web_call):
+        """Try Reddit's JSON feed; if Reddit blocks this network, switch to web pages
+        for the rest of this run."""
+        if self.mode == "json":
+            try:
+                return json_call()
+            except Blocked:
+                if self.using_oauth:
+                    raise
+                log.info("Reddit blocked its data feed on this network; reading web pages instead.")
+                self.mode = "web"
+        return web_call()
 
     @staticmethod
     def _posts(listing):
@@ -141,14 +170,58 @@ class RedditClient:
         params = {"limit": limit}
         if t:
             params["t"] = t
-        return self._posts(self.get(f"/r/{name}/{sort}", params))
+
+        def web():
+            wp = {"name": name}
+            if t:
+                wp["t"] = t
+            return webparse.parse_listing(self._web(
+                f"/svc/shreddit/community-more-posts/{sort}/", wp, f"r/{name}"))
+        return self._use(lambda: self._posts(self.get(f"/r/{name}/{sort}", params)), web)
 
     def search(self, query, sort="comments", t="day", limit=100):
-        return self._posts(self.get("/search", {"q": query, "sort": sort, "t": t,
-                                                "limit": limit, "type": "link"}))
+        def web():
+            posts = webparse.parse_search(self._web(
+                "/svc/shreddit/search/", {"q": query, "sort": sort, "t": t, "type": "link"},
+                f"search '{query}'"))
+            self.fill_links(posts)
+            return posts
+        return self._use(lambda: self._posts(self.get("/search", {
+            "q": query, "sort": sort, "t": t, "limit": limit, "type": "link"})), web)
 
-    def top_comments(self, post_id, limit=8):
+    def fill_links(self, posts):
+        """Search pages don't show where a post links to; look that up in one batch.
+        Posts whose link stays unknown are kept out of alerts (uniqueness can't be checked)."""
+        need = [p for p in posts if p.get("_needs_link")]
+        for i in range(0, len(need), 25):
+            chunk = need[i:i + 25]
+            ids = ",".join("t3_" + p["id"] for p in chunk)
+            try:
+                feed = self._fetch(f"{PUBLIC_BASE}/by_id/{ids}/.rss", "application/atom+xml",
+                                   "post details")
+            except RedditError as e:
+                log.warning("Could not look up search result links: %s", e)
+                continue
+            info = webparse.parse_by_id_rss(feed)
+            for p in chunk:
+                if p["id"] in info:
+                    url = info[p["id"]]["url"]
+                    p.update(url=url, selftext=info[p["id"]]["selftext"], _needs_link=False)
+                    host = (urllib.parse.urlparse(url).hostname or "").lower()
+                    p["domain"] = host[4:] if host.startswith("www.") else host
+                    p["is_self"] = f"/comments/{p['id']}" in url
+
+    def top_comments(self, post_id, limit=8, subreddit=None):
         """Return the top-level comments (highest scored first) as dicts."""
+        def web():
+            if not subreddit:
+                return []
+            return webparse.parse_comments(self._web(
+                f"/svc/shreddit/comments/r/{subreddit}/t3_{post_id}", {"sort": "top"},
+                "comments"), limit)
+        return self._use(lambda: self._json_comments(post_id, limit), web)
+
+    def _json_comments(self, post_id, limit):
         data = self.get(f"/comments/{post_id}", {"sort": "top", "limit": limit * 3, "depth": 1})
         if not isinstance(data, list) or len(data) < 2:
             return []

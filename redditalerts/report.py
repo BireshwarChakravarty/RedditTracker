@@ -160,7 +160,8 @@ def build_report(cfg, client, posts, topic=None, keywords=None):
         e = alert_item(p)
         e["selftext"] = p.get("selftext") or ""
         try:
-            e["comments"] = client.top_comments(p["id"], cfg["report"]["top_comments_per_post"])
+            e["comments"] = client.top_comments(p["id"], cfg["report"]["top_comments_per_post"],
+                                               subreddit=p.get("subreddit"))
         except Exception as ex:
             log.warning("Could not load comments for %s: %s", p["id"], ex)
             e["comments"] = []

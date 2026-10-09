@@ -12,7 +12,20 @@ from .report import build_report
 log = logging.getLogger(__name__)
 
 
-def fetch_pool(cfg, client, extra_queries=()):
+def search_posts(client, queries, errors):
+    found = {}
+    for q in queries:
+        if not q.strip():
+            continue
+        try:
+            for p in client.search(q.strip(), sort="comments", t="day"):
+                found[p["id"]] = p
+        except RedditError as e:
+            errors.append(f"search '{q}': {e}")
+    return found
+
+
+def fetch_pool(cfg, client):
     """All candidate posts from the watched subreddits and searches, keyed by id."""
     pool, errors = {}, []
     for sub in cfg["subreddits"]:
@@ -26,14 +39,7 @@ def fetch_pool(cfg, client, extra_queries=()):
             except RedditError as e:
                 errors.append(f"r/{sub}: {e}")
                 break
-    for q in list(cfg.get("search_queries") or []) + list(extra_queries):
-        if not q.strip():
-            continue
-        try:
-            for p in client.search(q.strip(), sort="comments", t="day"):
-                pool[p["id"]] = p
-        except RedditError as e:
-            errors.append(f"search '{q}': {e}")
+    pool.update(search_posts(client, cfg.get("search_queries") or [], errors))
     return list(pool.values()), errors
 
 
@@ -67,8 +73,7 @@ def alerts_allowed_now(cfg, store):
 def run_cycle(cfg, store, client, send=True, make_report=False, report_topic=None,
               report_keywords=None):
     started = time.time()
-    extra = list(report_keywords if report_keywords is not None else cfg["report"].get("keywords") or [])
-    posts, errors = fetch_pool(cfg, client, extra_queries=extra if make_report else ())
+    posts, errors = fetch_pool(cfg, client)
     if not posts and errors:
         errors.insert(0, "Could not load anything from Reddit.")
     good, skipped = qualifying(cfg, store, posts)
@@ -85,8 +90,13 @@ def run_cycle(cfg, store, client, send=True, make_report=False, report_topic=Non
             store.state["backups"] = backups
 
     if make_report and posts:
+        # Report keywords are also searched Reddit-wide, but those results feed only the
+        # report, never the alerts.
+        keywords = report_keywords if report_keywords is not None else cfg["report"].get("keywords") or []
+        report_pool = {p["id"]: p for p in posts}
+        report_pool.update(search_posts(client, keywords, result["errors"]))
         try:
-            path, info = build_report(cfg, client, posts, topic=report_topic,
+            path, info = build_report(cfg, client, list(report_pool.values()), topic=report_topic,
                                       keywords=report_keywords)
             if path:
                 result["report"] = info

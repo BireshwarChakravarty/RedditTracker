@@ -58,6 +58,8 @@ def source_post(post):
 def uniqueness_problem(post, cfg):
     """Return a reason string if the post's content came from / was shared on another
     platform, else None."""
+    if post.get("_needs_link"):
+        return "couldn't confirm where it links"
     blocked = [d.lower() for d in cfg["blocked_domains"]]
     for p in (post, source_post(post)):
         link_host = domain_of(p.get("url") or "")

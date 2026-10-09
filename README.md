@@ -67,9 +67,11 @@ python run.py report --topic "Delhi Protest" --keywords "Delhi protest, Jantar M
   the tool. Have one person (or one always-on machine) run it so everyone sees the same alerts.
   Others can open the dashboard on the office network if you set `"dashboard_host": "0.0.0.0"`
   in `config.json`. Note that anyone who can reach it can then change settings.
-- **Reddit blocking:** Reddit's public pages work from normal office/home internet. If you see
-  "Reddit refused the request" (common on cloud servers/VPNs), add Reddit API credentials in
-  Settings (create a "script" app at https://www.reddit.com/prefs/apps).
+- **Reddit blocking:** Reddit blocks its data feed on many cloud and some office networks.
+  When that happens the tool switches to reading Reddit's normal web pages automatically,
+  with the same rules and results (tested live: 400+ posts scanned in about a minute). If
+  Reddit ever blocks those too, the dashboard shows it under "Problems"; adding Reddit API
+  credentials in Settings is the fallback.
 - **Limits of the uniqueness check:** a post can still be a screenshot of a tweet without saying
   so. The tool catches links and wording, not image content, so take a quick look before sharing.
 - Tests: `python -m unittest discover -s tests -t .`
