@@ -1,0 +1,96 @@
+name: Reddit Alerts
+
+# Checks Reddit every 20 minutes, saves history to the "alerts-data" branch and
+# publishes the dashboard to GitHub Pages. Run it by hand from the Actions tab to
+# check now or to create a report on a specific topic.
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+    inputs:
+      report_topic:
+        description: "Create a Word report on this topic (leave empty to just check for alerts)"
+        required: false
+        default: ""
+      report_keywords:
+        description: "Report keywords, comma separated (optional)"
+        required: false
+        default: ""
+
+concurrency:
+  group: reddit-alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      DATA_DIR: store/data
+      REPORTS_DIR: store/reports
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Load saved history
+        run: |
+          if git ls-remote --exit-code --heads origin alerts-data > /dev/null; then
+            git fetch --quiet --depth 1 origin alerts-data
+            git worktree add --quiet --detach store FETCH_HEAD
+          else
+            mkdir -p store && git -C store init --quiet
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install AI package (only if an Anthropic key is set)
+        if: env.ANTHROPIC_API_KEY != ''
+        run: pip install --quiet anthropic
+
+      - name: Check Reddit
+        env:
+          REPORT_TOPIC: ${{ inputs.report_topic }}
+          REPORT_KEYWORDS: ${{ inputs.report_keywords }}
+        run: |
+          args=(once --auto-report)
+          if [ -n "$REPORT_TOPIC" ]; then args+=(--topic "$REPORT_TOPIC"); fi
+          if [ -n "$REPORT_KEYWORDS" ]; then args+=(--keywords "$REPORT_KEYWORDS"); fi
+          python run.py "${args[@]}" || echo "::warning::The check reported problems; they are shown on the web page."
+
+      - name: Build web page
+        run: python run.py publish --out site --repo "$GITHUB_REPOSITORY"
+
+      - name: Save history
+        working-directory: store
+        run: |
+          git checkout --quiet --orphan "snapshot-${GITHUB_RUN_ID}"
+          git add -A
+          git -c user.name="reddit-alerts-bot" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit --quiet -m "Alerts data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push --quiet --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "snapshot-${GITHUB_RUN_ID}:alerts-data"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
