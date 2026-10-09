@@ -12,8 +12,7 @@ DEFAULTS = {
     # --- What to watch -------------------------------------------------------
     "subreddits": [
         "india", "IndiaSpeaks", "indianews", "IndianFocus", "CriticalThinkingIndia",
-        "unitedstatesofindia", "indiadiscussion", "IndianModerate", "delhi",
-        "mumbai", "bangalore", "kolkata", "chennai", "hyderabad", "pune",
+        "unitedstatesofindia", "indiadiscussion", "IndianModerate",
     ],
     # Extra Reddit-wide searches (e.g. "Delhi protest"). Leave empty to skip.
     "search_queries": [],
