@@ -1,11 +1,15 @@
 name: Reddit Alerts
 
-# Checks Reddit every 20 minutes, saves history to the "alerts-data" branch and
-# publishes the dashboard to GitHub Pages. Run it by hand from the Actions tab to
-# check now or to create a report on a specific topic.
+# Checks Reddit, saves history to the "alerts-data" branch and publishes the
+# dashboard to GitHub Pages. Run it by hand from the Actions tab to check now or to
+# create a report on a specific topic.
+#
+# The 20-minute schedule is paused until Reddit API credentials are set up
+# (REDDIT_CLIENT_ID / REDDIT_CLIENT_SECRET secrets); Reddit blocks GitHub's servers
+# without them. To turn it back on, remove the "#" from the two schedule lines.
 on:
-  schedule:
-    - cron: "*/20 * * * *"
+  # schedule:
+  #   - cron: "*/20 * * * *"
   workflow_dispatch:
     inputs:
       report_topic:
